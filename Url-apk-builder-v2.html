@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Yova's Web to APK Builder</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet"/>
+<style>
+  /* ── THEME DEFINITIONS ─────────────────────────────────────────── */
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --card: #16161f;
+    --border: #2a2a3a;
+    --accent: #00e5a0;
+    --accent2: #7c5cfc;
+    --accent3: #ff5c87;
+    --text: #e8e8f0;
+    --muted: #6b6b88;
+    --grid-color: rgba(0,229,160,0.03);
+    --mono: 'Space Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+  [data-theme="purple"] {
+    --bg: #08080f;
+    --surface: #10101a;
+    --card: #141420;
+    --border: #28284a;
+    --accent: #a78bfa;
+    --accent2: #ec4899;
+    --accent3: #38bdf8;
+    --text: #ede9fe;
+    --muted: #6d6d9a;
+    --grid-color: rgba(167,139,250,0.04);
+  }
+  [data-theme="amber"] {
+    --bg: #0d0a00;
+    --surface: #181200;
+    --card: #1e1800;
+    --border: #3a2e00;
+    --accent: #f59e0b;
+    --accent2: #ef4444;
+    --accent3: #10b981;
+    --text: #fef3c7;
+    --muted: #a07c1a;
+    --grid-color: rgba(245,158,11,0.04);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+    transition: background 0.35s, color 0.35s;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--grid-color) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+    background-size: 40px 40px;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .noise {
+    position: fixed;
+    inset: 0;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 24px 60px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── THEME SWITCHER ──────────────────────────────────────────────── */
+  .theme-switcher {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 30px;
+    padding: 7px 12px 7px 16px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+    transition: background 0.35s, border-color 0.35s;
+  }
+  .theme-switcher-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    white-space: nowrap;
+    transition: color 0.35s;
+  }
+  .theme-dots { display: flex; gap: 7px; align-items: center; }
+  .theme-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2.5px solid transparent;
+    cursor: pointer;
+    transition: transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+    flex-shrink: 0;
+  }
+  .theme-dot:hover { transform: scale(1.2); }
+  .theme-dot.active {
+    border-color: var(--text);
+    box-shadow: 0 0 0 2px var(--bg);
+    transform: scale(1.18);
+  }
+  .theme-dot[data-t="green"]  { background: radial-gradient(circle at 35% 35%, #00e5a0, #007a56); }
+  .theme-dot[data-t="purple"] { background: radial-gradient(circle at 35% 35%, #a78bfa, #4c1d95); }
+  .theme-dot[data-t="amber"]  { background: radial-gradient(circle at 35% 35%, #f59e0b, #7c3a00); }
+
+  /* ── HEADER ────────────────────────────────────────────────────── */
+  header { padding: 60px 0 48px; text-align: center; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    padding: 6px 14px;
+    border-radius: 2px;
+    margin-bottom: 28px;
+    background: color-mix(in srgb, var(--accent) 5%, transparent);
+    transition: color 0.35s, border-color 0.35s, background 0.35s;
+  }
+  .badge::before {
+    content: '';
+    width: 6px; height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+    transition: background 0.35s;
+  }
+  @keyframes pulse {
+    0%,100% { opacity:1; transform:scale(1); }
+    50% { opacity:0.4; transform:scale(1.3); }
+  }
+
+  h1 {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: clamp(42px, 7vw, 72px);
+    line-height: 1;
+    letter-spacing: -0.03em;
+    margin-bottom: 16px;
+    transition: color 0.35s;
+  }
+  h1 span { color: var(--accent); transition: color 0.35s; }
+
+  .subtitle {
+    color: var(--muted);
+    font-size: 15px;
+    max-width: 480px;
+    margin: 0 auto;
+    line-height: 1.6;
+    font-family: var(--mono);
+    transition: color 0.35s;
+  }
+
+  /* ── CARDS ──────────────────────────────────────────────────────── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 40px;
+    margin-bottom: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: background 0.35s, border-color 0.35s;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0.5;
+    transition: background 0.35s;
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: color 0.35s;
+  }
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+    transition: background 0.35s;
+  }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+  .form-row.full { grid-template-columns: 1fr; }
+  .field { display: flex; flex-direction: column; gap: 8px; }
+
+  label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    transition: color 0.35s;
+  }
+
+  input, select, textarea {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 12px 16px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.35s, color 0.35s;
+    width: 100%;
+  }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 10%, transparent);
+  }
+  input::placeholder { color: color-mix(in srgb, var(--muted) 50%, transparent); }
+  select option { background: var(--surface); color: var(--text); }
+
+  .color-row { display: flex; gap: 12px; align-items: center; }
+  input[type="color"] {
+    width: 48px; height: 44px; padding: 4px;
+    cursor: pointer; flex-shrink: 0; border-radius: 3px;
+  }
+
+  /* ── URL VALIDATION ─────────────────────────────────────────────── */
+  .url-wrap { position: relative; }
+  .url-status {
+    position: absolute;
+    right: 12px; top: 50%;
+    transform: translateY(-50%);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    padding: 3px 8px;
+    border-radius: 2px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .url-status.show { opacity: 1; }
+  .url-status.valid   { color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+  .url-status.invalid { color: var(--accent3); background: color-mix(in srgb, var(--accent3) 10%, transparent); }
+  #url { padding-right: 90px; }
+
+  /* ── TOGGLES ────────────────────────────────────────────────────── */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    transition: border-color 0.35s;
+  }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-info { flex: 1; }
+  .toggle-info strong { font-size: 14px; display: block; margin-bottom: 2px; }
+  .toggle-info span { font-size: 12px; color: var(--muted); font-family: var(--mono); transition: color 0.35s; }
+
+  .toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute;
+    inset: 0;
+    background: var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .slider::before {
+    content: '';
+    position: absolute;
+    width: 18px; height: 18px;
+    left: 3px; top: 3px;
+    background: var(--muted);
+    border-radius: 50%;
+    transition: transform 0.2s, background 0.2s;
+  }
+  .toggle input:checked + .slider { background: color-mix(in srgb, var(--accent) 25%, transparent); }
+  .toggle input:checked + .slider::before { transform: translateX(20px); background: var(--accent); }
+
+  /* ── GENERATE BUTTON ────────────────────────────────────────────── */
+  .btn-generate {
+    width: 100%;
+    padding: 18px;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 3px;
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: 15px;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .btn-generate:hover { transform: translateY(-1px); box-shadow: 0 8px 30px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .btn-generate:active { transform: translateY(0); }
+
+  /* ── OUTPUT ─────────────────────────────────────────────────────── */
+  .output-section { display: none; animation: fadeUp 0.4s ease; }
+  .output-section.visible { display: block; }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── TABS ───────────────────────────────────────────────────────── */
+  .tabs-wrap { position: relative; }
+  .tabs-wrap::after {
+    content: '';
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 40px;
+    background: linear-gradient(to right, transparent, var(--card));
+    pointer-events: none;
+    z-index: 2;
+    transition: background 0.35s;
+  }
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .tabs::-webkit-scrollbar { height: 3px; }
+  .tabs::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .tab {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 12px 20px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+    letter-spacing: 0.05em;
+    background: none;
+    border-top: none; border-left: none; border-right: none;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  pre {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    padding: 24px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.7;
+    color: color-mix(in srgb, var(--text) 70%, var(--muted));
+    max-height: 400px;
+    overflow-y: auto;
+    transition: background 0.35s, border-color 0.35s;
+  }
+
+  .kw  { color: var(--accent2); }
+  .str { color: var(--accent); }
+  .cm  { color: var(--muted); font-style: italic; }
+  .tag { color: var(--accent3); }
+  .attr{ color: #ffb830; }
+  .val { color: var(--accent); }
+
+  .file-actions {
+    display: flex;
+    gap: 10px;
+    padding: 14px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    transition: background 0.35s, border-color 0.35s;
+  }
+
+  .btn-sm {
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 8px 16px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+    letter-spacing: 0.05em;
+    border: 1px solid;
+  }
+  .btn-copy { background: transparent; border-color: var(--border); color: var(--muted); }
+  .btn-copy:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-dl { background: var(--accent2); border-color: var(--accent2); color: white; }
+  .btn-dl:hover { opacity: 0.85; }
+  .btn-dl-all { background: transparent; border-color: var(--accent); color: var(--accent); }
+  .btn-dl-all:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+
+  /* ── STEPS ──────────────────────────────────────────────────────── */
+  .steps-grid { display: grid; gap: 16px; margin-top: 8px; }
+  .step {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+    padding: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    transition: background 0.35s, border-color 0.35s;
+  }
+  .step-num {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    opacity: 0.4;
+    line-height: 1;
+    flex-shrink: 0;
+    width: 32px;
+    transition: color 0.35s;
+  }
+  .step-body strong { display: block; font-size: 14px; margin-bottom: 6px; }
+  .step-body p { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .step-body code {
+    font-family: var(--mono);
+    font-size: 12px;
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    color: var(--accent);
+    padding: 2px 6px;
+    border-radius: 2px;
+    transition: background 0.35s, color 0.35s;
+  }
+
+  /* ── NOTICES ────────────────────────────────────────────────────── */
+  .notice {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    background: color-mix(in srgb, var(--accent2) 8%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent2) 20%, transparent);
+    border-radius: 3px;
+    padding: 16px 20px;
+    margin-top: 24px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.6;
+    transition: background 0.35s, border-color 0.35s;
+  }
+  .notice-warn {
+    background: color-mix(in srgb, var(--accent3) 7%, transparent);
+    border-color: color-mix(in srgb, var(--accent3) 20%, transparent);
+  }
+  .notice-icon { font-size: 18px; flex-shrink: 0; }
+
+  /* ── PHASE LABELS ───────────────────────────────────────────────── */
+  .phase-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    color: var(--text);
+    font-weight: 700;
+    padding: 8px 14px;
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    border-left: 3px solid var(--accent);
+    border-radius: 2px;
+    transition: background 0.35s, border-color 0.35s, color 0.35s;
+  }
+
+  /* ── ICON UPLOAD ────────────────────────────────────────────────── */
+  .icon-upload-area {
+    border: 2px dashed var(--border);
+    border-radius: 6px;
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 140px;
+  }
+  .icon-upload-area:hover, .icon-upload-area.drag-over {
+    border-color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 4%, transparent);
+  }
+  .icon-upload-label { font-size: 14px; color: var(--text); font-family: var(--sans); font-weight: 600; }
+  .icon-upload-hint  { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .icon-preview-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+
+  /* ── COLLAPSIBLE (dark-themed) ──────────────────────────────────── */
+  .collapsible-box {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: var(--surface);
+    margin-top: 24px;
+    overflow: hidden;
+    transition: background 0.35s, border-color 0.35s;
+  }
+  .collapsible-header {
+    padding: 16px 20px;
+    cursor: pointer;
+    font-weight: 700;
+    font-family: var(--sans);
+    font-size: 14px;
+    background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text);
+    border-left: 3px solid var(--accent);
+    transition: background 0.2s, color 0.35s, border-color 0.35s;
+  }
+  .collapsible-header:hover { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+  .collapsible-content {
+    padding: 24px;
+    display: none;
+    background: var(--card);
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.8;
+    transition: background 0.35s;
+  }
+  .collapsible-content h3 {
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    margin: 20px 0 10px;
+  }
+  .collapsible-content h3:first-child { margin-top: 0; }
+  .collapsible-content p { margin-bottom: 12px; }
+  .collapsible-content ol, .collapsible-content ul { padding-left: 20px; margin-bottom: 12px; }
+  .collapsible-content li { margin-bottom: 6px; }
+  .collapsible-content code {
+    font-family: var(--mono);
+    font-size: 11px;
+    background: color-mix(in srgb, var(--accent) 8%, transparent);
+    color: var(--accent);
+    padding: 2px 6px;
+    border-radius: 2px;
+    transition: background 0.35s, color 0.35s;
+  }
+  .collapsible-box.active .collapsible-content { display: block; }
+  .arrow { transition: transform 0.2s ease; font-style: normal; display: inline-block; }
+  .collapsible-box.active .arrow { transform: rotate(90deg); }
+
+  /* ── PLAY SECTION ───────────────────────────────────────────────── */
+  .play-section {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+    position: relative;
+    z-index: 1;
+  }
+  .play-section h2 {
+    font-family: var(--sans);
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--text);
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+    transition: color 0.35s;
+  }
+
+  @media (max-width: 600px) {
+    .card { padding: 24px 20px; }
+    .form-row { grid-template-columns: 1fr; }
+    .theme-switcher { top: 12px; right: 12px; padding: 6px 10px 6px 12px; }
+    .theme-switcher-label { display: none; }
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+<div class="noise"></div>
+
+<!-- ── THEME SWITCHER ────────────────────────────────────────────────── -->
+<div class="theme-switcher">
+  <span class="theme-switcher-label">Theme</span>
+  <div class="theme-dots">
+    <div class="theme-dot active" data-t="green"  title="Cyber Green"  onclick="setTheme('green',this)"></div>
+    <div class="theme-dot"        data-t="purple" title="Purple Storm" onclick="setTheme('purple',this)"></div>
+    <div class="theme-dot"        data-t="amber"  title="Solar Amber"  onclick="setTheme('amber',this)"></div>
+  </div>
+</div>
+
+<div class="container">
+  <header>
+    <div class="badge">by Yova</div>
+    <h1>Yova's <span>Web&#8594;APK</span></h1>
+    <p class="subtitle">Wrap any URL into a native Android APK project — ready to build in Android Studio.</p>
+  </header>
+
+  <!-- 01 Config -->
+  <div class="card">
+    <div class="section-label">01 — App Configuration</div>
+    <div class="form-row full">
+      <div class="field">
+        <label>Website URL *</label>
+        <div class="url-wrap">
+          <input type="text" id="url" placeholder="your-website.com or https://your-website.com" autocomplete="off"/>
+          <span class="url-status" id="urlStatus"></span>
+        </div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>App Name *</label>
+        <input type="text" id="appName" placeholder="My App"/>
+      </div>
+      <div class="field">
+        <label>Package Name *</label>
+        <input type="text" id="packageName" placeholder="com.yourname.myapp"/>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Version Name</label>
+        <input type="text" id="versionName" placeholder="1.0.0"/>
+      </div>
+      <div class="field">
+        <label>Version Code</label>
+        <input type="number" id="versionCode" placeholder="1" min="1"/>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Min SDK Version</label>
+        <select id="minSdk">
+          <option value="21">API 21 — Android 5.0 (Lollipop)</option>
+          <option value="23">API 23 — Android 6.0 (Marshmallow)</option>
+          <option value="24" selected>API 24 — Android 7.0 (Nougat)</option>
+          <option value="26">API 26 — Android 8.0 (Oreo)</option>
+          <option value="28">API 28 — Android 9.0 (Pie)</option>
+          <option value="29">API 29 — Android 10</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Target SDK Version</label>
+        <select id="targetSdk">
+          <option value="33">API 33 — Android 13</option>
+          <option value="34" selected>API 34 — Android 14</option>
+          <option value="35">API 35 — Android 15</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="field">
+        <label>Splash / Status Bar Color</label>
+        <div class="color-row">
+          <input type="color" id="themeColor" value="#121212"/>
+          <input type="text" id="themeColorHex" value="#121212" placeholder="#121212"/>
+        </div>
+      </div>
+      <div class="field">
+        <label>Orientation</label>
+        <select id="orientation">
+          <option value="unspecified">Unspecified (follow device)</option>
+          <option value="portrait">Portrait only</option>
+          <option value="landscape">Landscape only</option>
+          <option value="sensorPortrait">Sensor Portrait</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- 02 Icon -->
+  <div class="card">
+    <div class="section-label">02 — App Icon</div>
+    <div class="icon-upload-area" id="iconDropZone" onclick="document.getElementById('iconFile').click()">
+      <div class="icon-preview-wrap" id="iconPreviewWrap">
+        <svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5" style="color:var(--muted)"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 15l5-5 4 4 3-3 6 6"/><circle cx="8.5" cy="8.5" r="1.5"/></svg>
+        <p class="icon-upload-label">Click or drag &amp; drop your icon</p>
+        <p class="icon-upload-hint">PNG or JPG recommended · 1024&#215;1024px ideal</p>
+      </div>
+      <img id="iconPreview" src="" alt="App icon preview" style="display:none;width:96px;height:96px;border-radius:22%;object-fit:cover;border:2px solid var(--border);"/>
+    </div>
+    <input type="file" id="iconFile" accept="image/*" style="display:none"/>
+    <!-- FIX: only one display value — none by default, toggled to flex by JS -->
+    <div id="iconMeta" style="display:none;margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--muted);gap:16px;align-items:center;flex-wrap:wrap;">
+      <span id="iconFileName"></span>
+      <button class="btn-sm btn-copy" onclick="clearIcon(event)" style="padding:4px 10px;">&#10005; Remove</button>
+    </div>
+    <p style="margin-top:14px;font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.6;">
+      Your icon will be embedded as a <code style="background:color-mix(in srgb,var(--accent) 8%,transparent);color:var(--accent);padding:2px 6px;border-radius:2px;">ic_launcher.png</code> in the project.
+      Android Studio auto-generates all density variants (mdpi &#8594; xxxhdpi) via <em>Image Asset Studio</em>.
+    </p>
+  </div>
+
+  <!-- 03 WebView -->
+  <div class="card">
+    <div class="section-label">03 — WebView Features</div>
+    <div class="toggle-row">
+      <div class="toggle-info"><strong>JavaScript Enabled</strong><span>Enable JS execution in WebView (recommended)</span></div>
+      <label class="toggle"><input type="checkbox" id="jsEnabled" checked/><span class="slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-info"><strong>DOM Storage</strong><span>Allow localStorage and sessionStorage APIs</span></div>
+      <label class="toggle"><input type="checkbox" id="domStorage" checked/><span class="slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-info"><strong>Zoom Controls</strong><span>Enable pinch-to-zoom and browser zoom buttons</span></div>
+      <label class="toggle"><input type="checkbox" id="zoomEnabled"/><span class="slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-info"><strong>Geolocation</strong><span>Allow the site to access device location</span></div>
+      <label class="toggle"><input type="checkbox" id="geoEnabled"/><span class="slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-info"><strong>File Access</strong><span>Allow WebView to read local file:// URLs</span></div>
+      <label class="toggle"><input type="checkbox" id="fileAccess"/><span class="slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-info"><strong>Mixed Content (HTTP inside HTTPS)</strong><span>Allow insecure content in secure pages — not recommended</span></div>
+      <label class="toggle"><input type="checkbox" id="mixedContent"/><span class="slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-info"><strong>Full-screen Immersive Mode</strong><span>Hide status and navigation bars while browsing</span></div>
+      <label class="toggle"><input type="checkbox" id="fullscreen"/><span class="slider"></span></label>
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-info"><strong>External Links in Browser</strong><span>Open links to other domains in the system browser</span></div>
+      <label class="toggle"><input type="checkbox" id="extLinks" checked/><span class="slider"></span></label>
+    </div>
+  </div>
+
+  <button class="btn-generate" onclick="generate()">
+    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    Generate Android Project Files
+  </button>
+
+  <!-- Output -->
+  <div class="output-section" id="output">
+    <div style="margin-top:40px;">
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:24px 24px 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <div class="section-label" style="margin-bottom:0;">04 — Generated Files</div>
+          <button class="btn-sm btn-dl-all" onclick="downloadAllAsZip()">&#8595; Download ZIP</button>
+        </div>
+        <div class="tabs-wrap">
+          <div class="tabs" id="tabs" style="margin:16px 24px 0;"></div>
+        </div>
+        <div id="fileContents"></div>
+      </div>
+
+      <div class="card" style="margin-top:24px;">
+        <div class="section-label">05 — Build, Export APK &amp; Play Store Instructions</div>
+        <div style="margin-bottom:18px;"><div class="phase-label">&#128296; Option 1 — Build with Android Studio</div></div>
+        <div class="steps-grid">
+          <div class="step"><div class="step-num">01</div><div class="step-body"><strong>Download and Extract the ZIP</strong><p>Click <em>Download ZIP</em> above and extract it to a new folder. Keep the folder structure exactly as exported — the top-level folder is your Android project root.</p></div></div>
+          <div class="step"><div class="step-num">02</div><div class="step-body"><strong>Install Android Studio</strong><p>Install <strong>Android Studio</strong> with the Android SDK, platform tools, and an emulator. This is the easiest way to open, sync, build, sign, and debug the project.</p></div></div>
+          <div class="step"><div class="step-num">03</div><div class="step-body"><strong>Open the Project and Let Gradle Sync</strong><p>In Android Studio, choose <em>File &#8594; Open</em> and select the extracted folder. Wait for Gradle sync. If prompted to install a missing SDK or build tools version, allow it.</p></div></div>
+          <div class="step"><div class="step-num">04</div><div class="step-body"><strong>Apply Your App Icon</strong><p>Right-click <code>app/src/main/res</code> &#8594; <em>New &#8594; Image Asset</em>. Android Studio will generate launcher icon files for all required densities automatically.</p></div></div>
+          <div class="step"><div class="step-num">05</div><div class="step-body"><strong>Export an APK</strong><p>Use <em>Build &#8594; Build Bundle(s) / APK(s) &#8594; Build APK(s)</em> for a quick test build, or <em>Build &#8594; Generate Signed Bundle / APK</em> for a signed release APK. For Play Store use an <strong>.aab</strong> instead.</p></div></div>
+          <div class="step"><div class="step-num">06</div><div class="step-body"><strong>Test on a Device or Emulator</strong><p>Confirm the site loads correctly, navigation works, permissions behave as expected, and icon, splash color, and orientation match your intended release.</p></div></div>
+        </div>
+
+        <div style="margin:24px 0 18px;"><div class="phase-label">&#129320; Option 2 — Build with GitHub + GitHub Actions</div></div>
+        <div class="steps-grid">
+          <div class="step"><div class="step-num">07</div><div class="step-body"><strong>Download &amp; Extract the ZIP First</strong><p>Save and extract the ZIP before uploading to GitHub. GitHub Actions needs the actual project files — <code>app/</code>, <code>gradle/</code>, <code>build.gradle</code>, <code>settings.gradle</code>, <code>gradlew</code> — present in the repository.</p></div></div>
+          <div class="step"><div class="step-num">08</div><div class="step-body"><strong>Create a GitHub Repository and Upload</strong><p>Create a new repository, then upload the extracted project contents into the root. The top level should directly show <code>gradlew</code>, <code>settings.gradle</code>, and the <code>app</code> folder.</p></div></div>
+          <div class="step"><div class="step-num">09</div><div class="step-body"><strong>GitHub Actions Workflow (included)</strong><p>The ZIP already contains <code>.github/workflows/android-build.yml</code>. It checks out the repo, installs Java 17, caches Gradle, and runs <code>./gradlew assembleDebug</code> on every push. The resulting APK is uploaded as a workflow artifact.</p></div></div>
+          <div class="step"><div class="step-num">10</div><div class="step-body"><strong>Signed Release Builds</strong><p>For release APK/AAB, store your keystore as a Base64 secret in GitHub Secrets along with the keystore password, alias, and key password. Update the workflow to decode the keystore and pass signing config to Gradle.</p></div></div>
+          <div class="step"><div class="step-num">11</div><div class="step-body"><strong>Create the .jks Keystore Once</strong><p>Generate the keystore locally in Android Studio via <em>Build &#8594; Generate Signed Bundle / APK &#8594; Create new</em>, or with the Java <code>keytool</code> command. Reuse the same keystore for all future updates — Google Play requires consistent signing.</p></div></div>
+          <div class="step"><div class="step-num">12</div><div class="step-body"><strong>Host a Privacy Policy via GitHub Pages</strong><p>Google Play requires a public privacy policy URL. Enable GitHub Pages in repository settings and publish a simple static page. Use that URL in your Play Console listing.</p></div></div>
+        </div>
+
+        <div style="margin:24px 0 18px;"><div class="phase-label">&#128640; Final Step — Publish to Google Play Store</div></div>
+        <div class="steps-grid">
+          <div class="step"><div class="step-num">13</div><div class="step-body"><strong>Create a Google Play Developer Account</strong><p>Register at Google Play Console and complete all account setup steps. Keep your developer profile consistent with your business, brand, and privacy policy details.</p></div></div>
+          <div class="step"><div class="step-num">14</div><div class="step-body"><strong>Prepare a Signed AAB</strong><p>Option 1: generate the signed <strong>.aab</strong> in Android Studio. Option 2: let GitHub Actions build it using your stored keystore. Keep the <code>.jks</code>, alias, and passwords safely backed up forever.</p></div></div>
+          <div class="step"><div class="step-num">15</div><div class="step-body"><strong>Create the App Entry in Play Console</strong><p>Select <em>Create app</em>, enter your app name and language, declare whether it is an app or game, and complete the initial declarations.</p></div></div>
+          <div class="step"><div class="step-num">16</div><div class="step-body"><strong>Complete Store Listing &amp; App Content</strong><p>Add descriptions, screenshots, icon, feature graphic, contact details, privacy policy URL, target audience, ads declaration, and data safety responses. Incomplete sections are the most common cause of first-submission delays.</p></div></div>
+          <div class="step"><div class="step-num">17</div><div class="step-body"><strong>Upload, Review &amp; Roll Out</strong><p>Upload the signed <code>.aab</code> in <em>Production &#8594; Create new release</em>. Submit for review, monitor policy warnings, and roll out carefully. For every future update: increment version code, rebuild a signed AAB with the same keystore, publish a new release.</p></div></div>
+        </div>
+
+        <div class="notice" style="margin-top:20px;">
+          <span class="notice-icon">&#9889;</span>
+          <span><strong style="color:var(--text)">How to choose:</strong> Use <strong>Option 1</strong> for the simplest path. Use <strong>Option 2</strong> for automated cloud builds via GitHub Actions. The generated ZIP already includes the GitHub Actions workflow file.</span>
+        </div>
+        <div class="notice" style="margin-top:12px;">
+          <span class="notice-icon">&#129329;</span>
+          <span><strong style="color:var(--text)">Good practice:</strong> APK for local testing and sideloading. AAB for Play Store. Keep the same package name, signing key, and version identity across all future versions.</span>
+        </div>
+        <div class="notice notice-warn" style="margin-top:12px;">
+          <span class="notice-icon">&#9888;&#65039;</span>
+          <span><strong style="color:var(--text)">Important:</strong> A WebView wrapper alone may face Play policy or quality review issues. Your app should provide real utility, use a domain you own, include a valid privacy policy, and clearly explain what value the mobile app adds beyond simply opening a website.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div><!-- /container -->
+
+<!-- Google Play collapsible -->
+<div class="play-section">
+  <h2>Google Play Console — Payment &amp; Future Updates</h2>
+  <div class="collapsible-box">
+    <div class="collapsible-header" onclick="toggleBox(this)">
+      <span>&#128204; Google Play Developer Account — Important Notes</span>
+      <span class="arrow">&#9658;</span>
+    </div>
+    <div class="collapsible-content">
+      <p><strong style="color:var(--text)">Google Play Developer registration is a one-time payment.</strong> You do not pay again for future app updates under the same developer account.</p>
+
+      <h3>First-Time Payment to Publish on Google Play</h3>
+      <p>Google charges a <strong>one-time registration fee</strong> when creating the Play Console developer account. After approval, you can publish apps without paying again.</p>
+      <ol>
+        <li>Create or sign in with the Google account that will own the app.</li>
+        <li>Go to Google Play Console and register as a developer.</li>
+        <li>Pay the one-time developer registration fee.</li>
+        <li>Complete account verification steps requested by Google.</li>
+        <li>Create your app listing inside Play Console.</li>
+        <li>Upload your signed <code>.aab</code> file for release. APK can be used for testing, but Play Store production normally uses AAB.</li>
+      </ol>
+
+      <h3>How Updates Are Sent to Existing Devices</h3>
+      <p>Future updates do <strong>not</strong> require a new Play Console account or another registration payment.</p>
+      <ol>
+        <li>Make changes in your project and generate a new build.</li>
+        <li>Increment <code>versionCode</code> (and usually <code>versionName</code>).</li>
+        <li>Build a new signed APK/AAB using Option 1 or Option 2.</li>
+        <li>Upload the new signed <code>.aab</code> to the <strong>same existing app</strong> in Google Play Console.</li>
+        <li>Submit the release to the chosen track (Internal, Closed, Open, or Production).</li>
+        <li>After Google approves, devices receive the update automatically or via the update button in Play Store.</li>
+      </ol>
+
+      <h3>Important Rules for Future Updates</h3>
+      <ol>
+        <li><strong>Same package name</strong> — required for the new release to update the existing app on devices.</li>
+        <li><strong>Consistent signing</strong> — signing setup must stay aligned with the original release.</li>
+        <li><strong>Higher versionCode every release</strong> — Google Play rejects uploads with the same or lower versionCode.</li>
+        <li><strong>Prefer AAB for Play Store</strong> — Android App Bundle is the standard format for Play Store distribution.</li>
+      </ol>
+
+      <h3>The .jks Keystore and Updates</h3>
+      <p>Create the <code>.jks</code> keystore once locally before the first release. For Option 2, convert it to Base64 and store it in GitHub Secrets. During each GitHub Actions run, reconstruct the keystore temporarily for signing. <strong>Reuse the same keystore for all future releases.</strong> If the signing identity changes incorrectly, the new build will not be accepted as an update for the existing Play Store app.</p>
+
+      <h3>GitHub's Role vs. Google Play's Role</h3>
+      <p>GitHub stores code and automates builds. Google Play Console is the official release and update channel for end users. GitHub Actions cannot publish to Play Store automatically unless you add a separate deployment workflow using a Google Play service account.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── THEME SWITCHER ────────────────────────────────────────────────────────────
+function setTheme(theme, dotEl) {
+  if (theme === 'green') {
+    document.body.removeAttribute('data-theme');
+  } else {
+    document.body.setAttribute('data-theme', theme);
+  }
+  document.querySelectorAll('.theme-dot').forEach(d => d.classList.remove('active'));
+  dotEl.classList.add('active');
+  try { localStorage.setItem('apk-theme', theme); } catch(e) {}
+}
+
+(function restoreTheme() {
+  try {
+    const saved = localStorage.getItem('apk-theme');
+    if (saved && saved !== 'green') {
+      document.body.setAttribute('data-theme', saved);
+      const dot = document.querySelector('.theme-dot[data-t="' + saved + '"]');
+      if (dot) {
+        document.querySelectorAll('.theme-dot').forEach(d => d.classList.remove('active'));
+        dot.classList.add('active');
+      }
+    }
+  } catch(e) {}
+})();
+
+// ── ICON UPLOAD ───────────────────────────────────────────────────────────────
+var appIconDataUrl = null;
+
+var iconFile       = document.getElementById('iconFile');
+var iconDropZone   = document.getElementById('iconDropZone');
+var iconPreview    = document.getElementById('iconPreview');
+var iconPreviewWrap= document.getElementById('iconPreviewWrap');
+var iconMeta       = document.getElementById('iconMeta');
+var iconFileName   = document.getElementById('iconFileName');
+
+iconFile.addEventListener('change', function() {
+  if (this.files[0]) loadIcon(this.files[0]);
+});
+iconDropZone.addEventListener('dragover', function(e) {
+  e.preventDefault(); this.classList.add('drag-over');
+});
+iconDropZone.addEventListener('dragleave', function() {
+  this.classList.remove('drag-over');
+});
+iconDropZone.addEventListener('drop', function(e) {
+  e.preventDefault(); this.classList.remove('drag-over');
+  var f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) loadIcon(f);
+});
+
+function loadIcon(file) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    appIconDataUrl = e.target.result;
+    iconPreview.src = appIconDataUrl;
+    iconPreview.style.display = 'block';
+    iconPreviewWrap.style.display = 'none';
+    iconFileName.textContent = file.name + ' (' + (file.size/1024).toFixed(1) + ' KB)';
+    iconMeta.style.display = 'flex'; // FIX: was conflicting display values
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearIcon(e) {
+  e.stopPropagation();
+  appIconDataUrl = null;
+  iconPreview.src = '';
+  iconPreview.style.display = 'none';
+  iconPreviewWrap.style.display = 'flex';
+  iconMeta.style.display = 'none';
+  iconFile.value = '';
+}
+
+// ── COLOR SYNC ────────────────────────────────────────────────────────────────
+document.getElementById('themeColor').addEventListener('input', function() {
+  document.getElementById('themeColorHex').value = this.value;
+});
+document.getElementById('themeColorHex').addEventListener('input', function() {
+  if (/^#[0-9a-fA-F]{6}$/.test(this.value))
+    document.getElementById('themeColor').value = this.value;
+});
+
+// ── URL VALIDATION ────────────────────────────────────────────────────────────
+var urlInput  = document.getElementById('url');
+var urlStatus = document.getElementById('urlStatus');
+
+// Comprehensive TLD list — generic, country, new-wave, tech, business & more
+var KNOWN_TLDS = new Set([
+  // Generic
+  'com','net','org','edu','gov','mil','int',
+  // Common new gTLDs
+  'io','co','ai','app','dev','web','site','online','store','shop','blog',
+  'tech','cloud','digital','media','studio','agency','group','team',
+  'info','biz','name','pro','mobi','tel','travel','jobs','museum','coop','aero',
+  // New-wave / popular
+  'xyz','top','icu','live','news','today','world','space','earth','fun',
+  'life','style','club','zone','city','land','place','show','wiki','link',
+  'click','email','social','chat','video','photo','gallery','art','design',
+  'music','game','games','play','sport','fit','health','care','clinic',
+  'dental','legal','law','tax','finance','money','bank','capital','fund',
+  'insurance','mortgage','loan','credit','cash','pay','market','trade',
+  'build','construction','repair','solar','energy','green','eco',
+  'food','kitchen','coffee','pizza','bar','restaurant','hotel','holiday',
+  'rent','property','realty','estate','home','house','garden','furniture',
+  'fashion','beauty','hair','salon','spa','yoga','fitness','diet',
+  'school','academy','college','university','institute','training','coach',
+  'consulting','services','solutions','systems','software','tools','data',
+  'security','network','host','hosting','server','domains','email',
+  'marketing','seo','ads','media','press','news','report','review',
+  // Country codes (2-letter ISO)
+  'ac','ad','ae','af','ag','ai','al','am','ao','aq','ar','as','at','au',
+  'aw','ax','az','ba','bb','bd','be','bf','bg','bh','bi','bj','bl','bm',
+  'bn','bo','bq','br','bs','bt','bv','bw','by','bz','ca','cc','cd','cf',
+  'cg','ch','ci','ck','cl','cm','cn','cr','cu','cv','cw','cx','cy','cz',
+  'de','dj','dk','dm','do','dz','ec','ee','eg','eh','er','es','et','fi',
+  'fj','fk','fm','fo','fr','ga','gb','gd','ge','gf','gg','gh','gi','gl',
+  'gm','gn','gp','gq','gr','gs','gt','gu','gw','gy','hk','hm','hn','hr',
+  'ht','hu','id','ie','il','im','in','io','iq','ir','is','it','je','jm',
+  'jo','jp','ke','kg','kh','ki','km','kn','kp','kr','kw','ky','kz','la',
+  'lb','lc','li','lk','lr','ls','lt','lu','lv','ly','ma','mc','md','me',
+  'mf','mg','mh','mk','ml','mm','mn','mo','mp','mq','mr','ms','mt','mu',
+  'mv','mw','mx','my','mz','na','nc','ne','nf','ng','ni','nl','no','np',
+  'nr','nu','nz','om','pa','pe','pf','pg','ph','pk','pl','pm','pn','pr',
+  'ps','pt','pw','py','qa','re','ro','rs','ru','rw','sa','sb','sc','sd',
+  'se','sg','sh','si','sj','sk','sl','sm','sn','so','sr','ss','st','su',
+  'sv','sx','sy','sz','tc','td','tf','tg','th','tj','tk','tl','tm','tn',
+  'to','tr','tt','tv','tw','tz','ua','ug','uk','us','uy','uz','va','vc',
+  've','vg','vi','vn','vu','wf','ws','ye','yt','za','zm','zw',
+  // Popular second-level variants
+  'co.uk','co.nz','co.za','co.in','co.jp','co.ke','co.id',
+  'com.au','com.br','com.mx','com.ar','com.ph','com.sg','com.my',
+  'org.uk','net.au','gov.uk','gov.au','ac.uk','ac.nz'
+]);
+
+function hasTld(hostname) {
+  var lower = hostname.toLowerCase();
+  // Check compound TLDs first (e.g. co.uk)
+  var parts = lower.split('.');
+  if (parts.length >= 3) {
+    var compound = parts.slice(-2).join('.');
+    if (KNOWN_TLDS.has(compound)) return true;
+  }
+  // Single TLD
+  if (parts.length >= 2) {
+    var tld = parts[parts.length - 1];
+    if (KNOWN_TLDS.has(tld)) return true;
+    // Also accept any 2-6 letter TLD as a catch-all for new gTLDs
+    if (/^[a-z]{2,6}$/.test(tld)) return true;
+  }
+  return false;
+}
+
+function normalizeUrl(val) {
+  return /^https?:\/\//i.test(val) ? val : 'https://' + val;
+}
+
+urlInput.addEventListener('input', function() {
+  var val = this.value.trim();
+  if (!val) { urlStatus.className = 'url-status'; return; }
+
+  var normalized = normalizeUrl(val);
+  var ok = false;
+  try {
+    var u = new URL(normalized);
+    ok = (u.protocol === 'https:' || u.protocol === 'http:')
+      && u.hostname.length > 1
+      && hasTld(u.hostname);
+  } catch(ex) { ok = false; }
+
+  urlStatus.textContent = ok ? '\u2713 valid' : '\u2717 invalid';
+  urlStatus.className   = 'url-status show ' + (ok ? 'valid' : 'invalid');
+});
+
+// ── PACKAGE AUTO-GEN ─────────────────────────────────────────────────────────
+document.getElementById('appName').addEventListener('input', function() {
+  var pkg = document.getElementById('packageName');
+  if (!pkg.dataset.edited) {
+    pkg.value = 'com.example.' + this.value.toLowerCase().replace(/[^a-z0-9]/g,'');
+  }
+});
+document.getElementById('packageName').addEventListener('input', function() {
+  this.dataset.edited = 'true';
+});
+
+// ── FILES OBJECT ──────────────────────────────────────────────────────────────
+var files = {};
+
+// ── GENERATE ─────────────────────────────────────────────────────────────────
+function generate() {
+  var url         = document.getElementById('url').value.trim();
+  var appName     = document.getElementById('appName').value.trim() || 'My App';
+  var pkg         = document.getElementById('packageName').value.trim() || 'com.example.myapp';
+  var versionName = document.getElementById('versionName').value.trim() || '1.0.0';
+  var versionCode = document.getElementById('versionCode').value.trim() || '1';
+  var minSdk      = document.getElementById('minSdk').value;
+  var targetSdk   = document.getElementById('targetSdk').value;
+  var themeColor  = document.getElementById('themeColorHex').value || '#121212';
+  var orientation = document.getElementById('orientation').value;
+
+  var jsEnabled    = document.getElementById('jsEnabled').checked;
+  var domStorage   = document.getElementById('domStorage').checked;
+  var zoomEnabled  = document.getElementById('zoomEnabled').checked;
+  var geoEnabled   = document.getElementById('geoEnabled').checked;
+  var fileAccess   = document.getElementById('fileAccess').checked;
+  var mixedContent = document.getElementById('mixedContent').checked;
+  var fullscreen   = document.getElementById('fullscreen').checked;
+  var extLinks     = document.getElementById('extLinks').checked;
+
+  if (!url) { alert('Please enter a website URL.'); return; }
+  url = normalizeUrl(url);
+  try {
+    var u = new URL(url);
+    if ((u.protocol !== 'https:' && u.protocol !== 'http:') || !hasTld(u.hostname)) {
+      alert('Please enter a valid URL with a domain extension (e.g. https://your-website.com)'); return;
+    }
+  } catch(ex) {
+    alert('Please enter a valid URL (e.g. https://your-website.com)'); return;
+  }
+
+  // Clear previous
+  Object.keys(files).forEach(function(k){ delete files[k]; });
+
+  var pkgPath = pkg.replace(/\./g,'/');
+
+  // ── MainActivity.kt ────────────────────────────────────────────────────────
+  var fsImports = fullscreen ? 'import android.view.WindowInsets\nimport android.view.WindowInsetsController\n' : '';
+  var fsCode    = fullscreen ?
+    '        // Immersive full-screen mode\n        window.insetsController?.let { ctrl ->\n            ctrl.hide(WindowInsets.Type.statusBars() or WindowInsets.Type.navigationBars())\n            ctrl.systemBarsBehavior =\n                WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE\n        }\n' : '';
+
+  var geoClient = geoEnabled ?
+    '\n        webView.webChromeClient = object : WebChromeClient() {\n            override fun onGeolocationPermissionsShowPrompt(\n                origin: String,\n                callback: GeolocationPermissions.Callback\n            ) {\n                callback.invoke(origin, true, false)\n            }\n        }' :
+    '\n        webView.webChromeClient = WebChromeClient()';
+
+  var urlOverride = extLinks ?
+    '                val host = request.url.host ?: return false\n                val baseHost = Uri.parse("' + url + '").host ?: return false\n                return if (host == baseHost || host.endsWith(".${"$"}{baseHost}")) {\n                    false\n                } else {\n                    startActivity(Intent(Intent.ACTION_VIEW, request.url))\n                    true\n                }' :
+    '                return false';
+
+  var mixedLine = mixedContent ?
+    '            mixedContentMode = android.webkit.WebSettings.MIXED_CONTENT_ALWAYS_ALLOW' :
+    '            // mixedContentMode not changed (defaults to MIXED_CONTENT_NEVER_ALLOW)';
+
+  files['app/src/main/java/' + pkgPath + '/MainActivity.kt'] =
+'package ' + pkg + '\n\n' +
+'import android.annotation.SuppressLint\n' +
+'import android.content.Intent\n' +
+'import android.net.Uri\n' +
+'import android.os.Bundle\n' +
+fsImports +
+'import android.webkit.GeolocationPermissions\n' +
+'import android.webkit.WebChromeClient\n' +
+'import android.webkit.WebResourceRequest\n' +
+'import android.webkit.WebView\n' +
+'import android.webkit.WebViewClient\n' +
+'import androidx.appcompat.app.AppCompatActivity\n\n' +
+'class MainActivity : AppCompatActivity() {\n\n' +
+'    private lateinit var webView: WebView\n\n' +
+'    @SuppressLint("SetJavaScriptEnabled")\n' +
+'    override fun onCreate(savedInstanceState: Bundle?) {\n' +
+'        super.onCreate(savedInstanceState)\n' +
+fsCode +
+'        setContentView(R.layout.activity_main)\n' +
+'        webView = findViewById(R.id.webView)\n\n' +
+'        webView.settings.apply {\n' +
+'            javaScriptEnabled = ' + jsEnabled + '\n' +
+'            domStorageEnabled = ' + domStorage + '\n' +
+'            setSupportZoom(' + zoomEnabled + ')\n' +
+'            builtInZoomControls = ' + zoomEnabled + '\n' +
+'            displayZoomControls = false\n' +
+'            allowFileAccess = ' + fileAccess + '\n' +
+mixedLine + '\n' +
+'            loadWithOverviewMode = true\n' +
+'            useWideViewPort = true\n' +
+'            databaseEnabled = true\n' +
+'            mediaPlaybackRequiresUserGesture = false\n' +
+'        }\n' +
+geoClient + '\n\n' +
+'        webView.webViewClient = object : WebViewClient() {\n' +
+'            override fun shouldOverrideUrlLoading(\n' +
+'                view: WebView,\n' +
+'                request: WebResourceRequest\n' +
+'            ): Boolean {\n' +
+urlOverride + '\n' +
+'            }\n' +
+'        }\n\n' +
+'        webView.loadUrl("' + url + '")\n' +
+'    }\n\n' +
+'    @Suppress("OVERRIDE_DEPRECATION")\n' +
+'    override fun onBackPressed() {\n' +
+'        if (webView.canGoBack()) webView.goBack()\n' +
+'        else super.onBackPressed()\n' +
+'    }\n' +
+'}';
+
+  // ── activity_main.xml ───────────────────────────────────────────────────────
+  files['app/src/main/res/layout/activity_main.xml'] =
+'<?xml version="1.0" encoding="utf-8"?>\n' +
+'<FrameLayout\n' +
+'    xmlns:android="http://schemas.android.com/apk/res/android"\n' +
+'    android:layout_width="match_parent"\n' +
+'    android:layout_height="match_parent"\n' +
+'    android:background="' + themeColor + '">\n\n' +
+'    <WebView\n' +
+'        android:id="@+id/webView"\n' +
+'        android:layout_width="match_parent"\n' +
+'        android:layout_height="match_parent" />\n\n' +
+'</FrameLayout>';
+
+  // ── AndroidManifest.xml ─────────────────────────────────────────────────────
+  var geoPermissions = geoEnabled ?
+    '\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />' : '';
+
+  files['app/src/main/AndroidManifest.xml'] =
+'<?xml version="1.0" encoding="utf-8"?>\n' +
+'<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n\n' +
+'    <uses-permission android:name="android.permission.INTERNET" />\n' +
+'    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />' + geoPermissions + '\n\n' +
+'    <application\n' +
+'        android:allowBackup="true"\n' +
+'        android:icon="@mipmap/ic_launcher"\n' +
+'        android:label="@string/app_name"\n' +
+'        android:roundIcon="@mipmap/ic_launcher_round"\n' +
+'        android:supportsRtl="true"\n' +
+'        android:theme="@style/Theme.App"\n' +
+'        android:usesCleartextTraffic="' + mixedContent + '">\n\n' +
+'        <activity\n' +
+'            android:name=".MainActivity"\n' +
+'            android:exported="true"\n' +
+'            android:screenOrientation="' + orientation + '"\n' +
+'            android:configChanges="orientation|screenSize|keyboardHidden">\n' +
+'            <intent-filter>\n' +
+'                <action android:name="android.intent.action.MAIN" />\n' +
+'                <category android:name="android.intent.category.LAUNCHER" />\n' +
+'            </intent-filter>\n' +
+'        </activity>\n\n' +
+'    </application>\n\n' +
+'</manifest>';
+
+  // ── strings.xml ──────────────────────────────────────────────────────────────
+  files['app/src/main/res/values/strings.xml'] =
+'<resources>\n    <string name="app_name">' + escXml(appName) + '</string>\n</resources>';
+
+  // ── themes.xml — FIX: clean XML, no stray CSS ─────────────────────────────
+  files['app/src/main/res/values/themes.xml'] =
+'<resources>\n' +
+'    <style name="Theme.App" parent="Theme.AppCompat.NoActionBar">\n' +
+'        <item name="android:statusBarColor">' + themeColor + '</item>\n' +
+'        <item name="android:navigationBarColor">' + themeColor + '</item>\n' +
+'        <item name="android:windowBackground">' + themeColor + '</item>\n' +
+'    </style>\n' +
+'</resources>';
+
+  // ── app/build.gradle ─────────────────────────────────────────────────────────
+  files['app/build.gradle'] =
+"plugins {\n    id 'com.android.application'\n    id 'org.jetbrains.kotlin.android'\n}\n\n" +
+"android {\n    namespace '" + pkg + "'\n    compileSdk " + targetSdk + "\n\n" +
+"    defaultConfig {\n        applicationId '" + pkg + "'\n        minSdk " + minSdk + "\n        targetSdk " + targetSdk + "\n        versionCode " + versionCode + "\n        versionName '" + versionName + "'\n    }\n\n" +
+"    buildTypes {\n        release {\n            minifyEnabled false\n            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'\n        }\n    }\n\n" +
+"    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_1_8\n        targetCompatibility JavaVersion.VERSION_1_8\n    }\n\n" +
+"    kotlinOptions {\n        jvmTarget = '1.8'\n    }\n}\n\n" +
+"dependencies {\n    implementation 'androidx.core:core-ktx:1.12.0'\n    implementation 'androidx.appcompat:appcompat:1.6.1'\n    implementation 'com.google.android.material:material:1.11.0'\n}";
+
+  // ── root build.gradle ─────────────────────────────────────────────────────
+  files['build.gradle'] =
+"// Top-level build.gradle\nplugins {\n    id 'com.android.application' version '8.2.0' apply false\n    id 'org.jetbrains.kotlin.android' version '1.9.22' apply false\n}";
+
+  // ── settings.gradle ───────────────────────────────────────────────────────
+  files['settings.gradle'] =
+'pluginManagement {\n    repositories {\n        google()\n        mavenCentral()\n        gradlePluginPortal()\n    }\n}\n' +
+'dependencyResolutionManagement {\n    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)\n    repositories {\n        google()\n        mavenCentral()\n    }\n}\n\n' +
+'rootProject.name = "' + appName.replace(/"/g,'\\"') + '"\ninclude \':app\'';
+
+  // ── gradle.properties ─────────────────────────────────────────────────────
+  files['gradle.properties'] =
+'android.useAndroidX=true\nandroid.enableJetifier=true\norg.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8';
+
+  // ── gradle wrapper properties — FIX: was missing ──────────────────────────
+  files['gradle/wrapper/gradle-wrapper.properties'] =
+'distributionBase=GRADLE_USER_HOME\ndistributionPath=wrapper/dists\ndistributionUrl=https\\://services.gradle.org/distributions/gradle-8.2-bin.zip\nzipStoreBase=GRADLE_USER_HOME\nzipStorePath=wrapper/dists';
+
+  // ── proguard-rules.pro ────────────────────────────────────────────────────
+  files['app/proguard-rules.pro'] = '# Default ProGuard rules\n-keep class ' + pkg + '.** { *; }';
+
+  // ── GitHub Actions workflow — FIX: was missing ────────────────────────────
+  files['.github/workflows/android-build.yml'] =
+'name: Android Build\n\non:\n  push:\n    branches: [ main, master ]\n  pull_request:\n    branches: [ main, master ]\n  workflow_dispatch:\n\njobs:\n  build:\n    runs-on: ubuntu-latest\n    steps:\n      - uses: actions/checkout@v4\n\n      - name: Set up JDK 17\n        uses: actions/setup-java@v4\n        with:\n          java-version: \'17\'\n          distribution: \'temurin\'\n\n      - name: Cache Gradle\n        uses: actions/cache@v4\n        with:\n          path: |\n            ~/.gradle/caches\n            ~/.gradle/wrapper\n          key: gradle-${{ hashFiles(\'**/*.gradle*\', \'**/gradle-wrapper.properties\') }}\n\n      - name: Make gradlew executable\n        run: chmod +x gradlew\n\n      - name: Build Debug APK\n        run: ./gradlew assembleDebug\n\n      - name: Upload APK\n        uses: actions/upload-artifact@v4\n        with:\n          name: app-debug\n          path: app/build/outputs/apk/debug/app-debug.apk';
+
+  // ── icon ──────────────────────────────────────────────────────────────────
+  if (appIconDataUrl) {
+    files['app/src/main/res/mipmap-xxxhdpi/ic_launcher.png']       = appIconDataUrl;
+    files['app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png'] = appIconDataUrl;
+  }
+
+  renderOutput();
+}
+
+function escXml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function syntaxHighlight(code, path) {
+  var esc = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  if (path.endsWith('.kt')) {
+    return esc
+      .replace(/\b(package|import|class|object|fun|val|var|override|private|public|internal|return|if|else|true|false|null|this|super|when|is|as|apply|let|also|by|in|out|data|Suppress)\b/g,'<span class="kw">$1</span>')
+      .replace(/"([^"]*)"/g,'<span class="str">"$1"</span>')
+      .replace(/(\/\/[^\n]*)/g,'<span class="cm">$1</span>');
+  }
+  if (path.endsWith('.xml')) {
+    return esc
+      .replace(/(&lt;\/?)([\w:]+)/g,'<span class="tag">$1$2</span>')
+      .replace(/\b(xmlns:\w+|android:\w+)=/g,'<span class="attr">$1</span>=')
+      .replace(/"([^"]*)"/g,'<span class="val">"$1"</span>')
+      .replace(/(&lt;!--.*?--&gt;)/gs,'<span class="cm">$1</span>');
+  }
+  if (path.endsWith('.gradle') || path.endsWith('.properties') || path.endsWith('.yml')) {
+    return esc
+      .replace(/\b(plugins|android|dependencies|implementation|apply|id|version|include|namespace|compileSdk|minSdk|targetSdk|versionCode|versionName|release|debug|name|on|push|jobs|runs-on|steps|uses|with|run)\b/g,'<span class="kw">$1</span>')
+      .replace(/'([^']*)'/g,"<span class=\"str\">'$1'</span>")
+      .replace(/"([^"]*)"/g,'<span class="str">"$1"</span>')
+      .replace(/(\/\/[^\n]*)/g,'<span class="cm">$1</span>')
+      .replace(/(#[^\n]*)/g,'<span class="cm">$1</span>');
+  }
+  return esc;
+}
+
+var activeTab = 0;
+
+function renderOutput() {
+  var keys = Object.keys(files);
+  var tabsEl    = document.getElementById('tabs');
+  var contentsEl= document.getElementById('fileContents');
+  tabsEl.innerHTML = '';
+  contentsEl.innerHTML = '';
+
+  keys.forEach(function(path, i) {
+    var isImage = typeof files[path] === 'string' && files[path].startsWith('data:image');
+    var tab = document.createElement('button');
+    tab.className = 'tab' + (i===0?' active':'');
+    tab.textContent = path.split('/').pop();
+    tab.onclick = function(){ switchTab(i); };
+    tabsEl.appendChild(tab);
+
+    var div = document.createElement('div');
+    div.className = 'tab-content' + (i===0?' active':'');
+    div.id = 'tc-' + i;
+
+    var pathBar = '<div style="padding:8px 20px;font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--surface);border:1px solid var(--border);border-top:none;border-bottom:none;">' + path + '</div>';
+
+    var contentHtml;
+    if (isImage) {
+      contentHtml = pathBar +
+        '<div style="background:var(--surface);border:1px solid var(--border);border-top:none;padding:24px;display:flex;align-items:center;justify-content:center;gap:24px;">' +
+        '<img src="' + files[path] + '" style="width:96px;height:96px;border-radius:22%;object-fit:cover;border:2px solid var(--border);"/>' +
+        '<div style="font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.8;">' +
+        '<div>App icon (xxxhdpi)</div>' +
+        '<div style="color:var(--accent);">Use Image Asset Studio for all densities</div>' +
+        '</div></div>';
+    } else {
+      contentHtml = pathBar + '<pre><code>' + syntaxHighlight(files[path], path) + '</code></pre>';
+    }
+
+    var escapedPath = path.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    var disabledAttr = isImage ? ' disabled style="opacity:0.4;cursor:default;"' : '';
+    div.innerHTML = contentHtml +
+      '<div class="file-actions">' +
+      '<button class="btn-sm btn-copy"' + disabledAttr + ' onclick="copyFile(\'' + escapedPath + '\')">Copy</button>' +
+      '<button class="btn-sm btn-dl" onclick="downloadFile(\'' + escapedPath + '\')">&#8595; Download</button>' +
+      '</div>';
+    contentsEl.appendChild(div);
+  });
+
+  activeTab = 0;
+  document.getElementById('output').classList.add('visible');
+  document.getElementById('output').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function switchTab(i) {
+  document.querySelectorAll('.tab').forEach(function(t,j){ t.classList.toggle('active', j===i); });
+  document.querySelectorAll('.tab-content').forEach(function(t,j){ t.classList.toggle('active', j===i); });
+  activeTab = i;
+}
+
+function copyFile(path) {
+  navigator.clipboard.writeText(files[path]).then(function() {
+    var keys = Object.keys(files);
+    var i = keys.indexOf(path);
+    var tabs = document.querySelectorAll('.tab');
+    if (tabs[i]) {
+      var orig = tabs[i].textContent;
+      tabs[i].textContent = 'Copied!';
+      setTimeout(function(){ tabs[i].textContent = orig; }, 1500);
+    }
+  });
+}
+
+function downloadFile(path) {
+  var data = files[path];
+  if (typeof data === 'string' && data.startsWith('data:image')) {
+    var arr  = data.split(',');
+    var mime = arr[0].match(/:(.*?);/)[1];
+    var bstr = atob(arr[1]);
+    var n    = bstr.length;
+    var u8   = new Uint8Array(n);
+    while (n--) u8[n] = bstr.charCodeAt(n);
+    var blob = new Blob([u8], { type: mime });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = path.split('/').pop();
+    a.click();
+  } else {
+    var blob = new Blob([data], { type: 'text/plain' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = path.split('/').pop();
+    a.click();
+  }
+}
+
+function dataUrlToBlob(dataUrl) {
+  var parts  = dataUrl.split(',');
+  var mime   = parts[0].match(/:(.*?);/)[1];
+  var binary = atob(parts[1]);
+  var len    = binary.length;
+  var bytes  = new Uint8Array(len);
+  while (len--) bytes[len] = binary.charCodeAt(len);
+  return new Blob([bytes], { type: mime });
+}
+
+async function downloadAllAsZip() {
+  var keys = Object.keys(files);
+  if (!keys.length) { alert('Please generate the project files first.'); return; }
+  if (!window.JSZip) { alert('ZIP library failed to load. Please check your internet connection.'); return; }
+
+  var zip = new JSZip();
+  keys.forEach(function(path) {
+    var data = files[path];
+    if (typeof data === 'string' && data.startsWith('data:image')) {
+      zip.file(path, dataUrlToBlob(data));
+    } else {
+      zip.file(path, data);
+    }
+  });
+
+  var safeAppName = (document.getElementById('appName').value.trim() || 'android-project')
+    .toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+
+  var blob = await zip.generateAsync({ type: 'blob' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (safeAppName || 'android-project') + '.zip';
+  a.click();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1000);
+}
+
+function toggleBox(header) {
+  header.parentElement.classList.toggle('active');
+}
+</script>
+</body>
+</html>
